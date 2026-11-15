@@ -3,6 +3,8 @@ import { Button } from '../../themes/stargazer/kit/Button';
 import { cx } from '../../themes/stargazer/kit/cx';
 import { useWindowKey } from '../../hooks/useWindowKey';
 import { ParamsPanel } from './ParamsPanel';
+import { GenerateButton } from './GenerateButton';
+import { generateStatus } from './generateStatus';
 import { Info } from './Info';
 import { OptimaStepper } from './OptimaStepper';
 import { decodeParams, encodeParams, paramsReducer, toGenOptions } from './params';
@@ -41,9 +43,14 @@ export function PlaygroundScreen() {
   /* which other optimum is marked; tied to the outcome it was picked on, so a new level starts at the first */
   const [altPick, setAltPick] = useState({ key: '', idx: 0 });
   const [labels, setLabels] = useState<LabelMode>('degree');
-  const { running, outcome, error, wallMs, outcomeKey } = useGenerator(params);
+  const { generate, running, stale, outcome, error, wallMs, outcomeKey } = useGenerator(params);
   const recipes = useRecipes();
-  const reroll = () => dispatch({ type: 'set', patch: { seed: randomSeed() } });
+  /* asking for a new seed or a swept one is asking to see it, so those run at once; every other edit waits for Generate */
+  const showSeed = (patch: { seed: number; clock?: boolean }) => {
+    dispatch({ type: 'set', patch });
+    generate({ ...params, ...patch });
+  };
+  const reroll = () => showSeed({ seed: randomSeed() });
 
   /* the hash is the permalink: settings survive a reload and can be pasted */
   useEffect(() => {
@@ -54,6 +61,7 @@ export function PlaygroundScreen() {
     if (source === 'draw') return;   // the editor has its own keys
     if (e.key === 'r') reroll();
     if (e.key === 's') setShowSol(s => !s);
+    if (e.key === 'g' && !running) generate();
   });
 
   const level = outcome?.level ?? null;
@@ -73,9 +81,9 @@ export function PlaygroundScreen() {
           <Button size="xs" kind={source === 'draw' ? 'primary' : 'soft'} aria-pressed={source === 'draw'} onClick={() => setSource('draw')}>Draw by hand</Button>
         </span>
         {source === 'generate'
-          ? <span className={styles.hint}><kbd>r</kbd> new seed · <kbd>s</kbd> solution</span>
+          ? <span className={styles.hint}><kbd>g</kbd> generate · <kbd>r</kbd> new seed · <kbd>s</kbd> solution</span>
           : <span className={styles.hint}><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> tools · <kbd>z</kbd> undo · <kbd>Esc</kbd> stop a line</span>}
-        <span className={cx(styles.status, running && styles.busy)}>{running ? 'generating…' : error ? 'error' : 'ready'}</span>
+        {source === 'generate' && <span className={cx(styles.status, (running || stale) && styles.busy)}>{generateStatus(running, stale, error)}</span>}
       </header>
       {source === 'draw' ? (
         <div className={styles.layout}>
@@ -98,6 +106,7 @@ export function PlaygroundScreen() {
         </div>
         <main className={styles.main}>
           <div className={styles.toolbar}>
+            <GenerateButton running={running} stale={stale} onGenerate={() => generate()} />
             <Button size="xs" kind={view === 'schematic' ? 'primary' : 'soft'} onClick={() => setView('schematic')}>Schematic</Button>
             <Button size="xs" kind={view === 'sky' ? 'primary' : 'soft'} onClick={() => setView('sky')}>Sky</Button>
             <Button size="xs" kind="mint" onClick={reroll} title="random seed (r)">🎲 Seed {params.seed}</Button>
@@ -114,7 +123,7 @@ export function PlaygroundScreen() {
             {level && <Button size="xs" kind="outline" title="copy the level as JSON"
               onClick={() => navigator.clipboard?.writeText(JSON.stringify(level))}>Copy JSON</Button>}
           </div>
-          <div className={cx(styles.stage, running && styles.stale)}>
+          <div className={cx(styles.stage, (running || stale) && styles.stale)}>
             {error && <p className={styles.warn}>{error}</p>}
             {level && view === 'schematic' && outcome && (
               <SchematicView level={level} alt={showAlt ? alts[altIdx] ?? null : null} crossings={outcome.crossings}
@@ -125,7 +134,7 @@ export function PlaygroundScreen() {
             {level && <PlayBar status={playStatus(level, shown)} showSol={showSol} onClear={play.clear} />}
           </div>
           {/* the clock goes off too: a sweep's seeds are reproducible, so loading one shows that exact level */}
-          <VarietyPanel params={params} onLoadSeed={seed => dispatch({ type: 'set', patch: { seed, clock: false } })}
+          <VarietyPanel params={params} onLoadSeed={seed => showSeed({ seed, clock: false })}
             onLoadParams={patch => dispatch({ type: 'set', patch })} />
         </main>
         {outcome && <StatsPanel outcome={outcome} wallMs={wallMs} />}

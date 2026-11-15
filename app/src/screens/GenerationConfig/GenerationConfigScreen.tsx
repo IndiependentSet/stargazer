@@ -9,6 +9,8 @@ import { figureOf } from '../../domain/nights';
 import { Button } from '../../themes/stargazer/kit/Button';
 import { cx } from '../../themes/stargazer/kit/cx';
 import { Num } from '../Playground/controls';
+import { GenerateButton } from '../Playground/GenerateButton';
+import { generateStatus } from '../Playground/generateStatus';
 import { Info } from '../Playground/Info';
 import { useRecipes } from '../Recipes/useRecipes';
 import { editorReducer, initialEditor } from './editor';
@@ -74,11 +76,12 @@ export function GenerationConfigScreen() {
         <span className={styles.basis}>
           Today is day {today}.{view === 'schedule' && <> Editing {state.basis}{state.dirty && <span className={styles.dirty}> · edited</span>}</>}
         </span>
-        <span className={cx(pg.status, preview.running && pg.busy)}>{preview.running ? 'generating…' : preview.error ? 'error' : 'ready'}</span>
+        <span className={cx(pg.status, (preview.running || preview.stale) && pg.busy)}>{generateStatus(preview.running, preview.stale, preview.error)}</span>
+        <GenerateButton running={preview.running} stale={preview.stale} onGenerate={preview.generate} label="Generate the week" />
       </header>
       {view === 'drawn' ? (
         <ManualDays today={today} draft={draft} setDraft={setDraft} pinned={pinned}
-          startFrom={generated && !preview.running ? figureOf(generated) : null} />
+          startFrom={generated && !preview.running && !preview.stale ? figureOf(generated) : null} />
       ) : <div className={pg.layout}>
         <SchedulePanel state={state} dispatch={dispatch} recipes={recipes} />
         <main className={pg.main}>
@@ -92,7 +95,7 @@ export function GenerationConfigScreen() {
               Hand-drawn on this night: sky {drawnHere.map(i => i + 1).join(', ')} (they replace the generated ones)
             </span>}
           </div>
-          <WeekPreview sites={preview.sites} running={preview.running} error={preview.error} previewKey={preview.previewKey}
+          <WeekPreview sites={preview.sites} running={preview.running} stale={preview.stale} error={preview.error} previewKey={preview.previewKey}
             tab={state.tab} onTab={tab => dispatch({ type: 'tab', tab })} />
         </main>
         <div className={styles.side}>

@@ -15,6 +15,8 @@ import styles from './GenerationConfig.module.css';
 interface Props {
   sites: SitePreview[] | null;
   running: boolean;
+  /** the draft or day has changed since this week was made */
+  stale: boolean;
   error: string | null;
   previewKey: string;
   tab: Tab;
@@ -22,7 +24,7 @@ interface Props {
 }
 
 /** The week the draft makes on the preview day, and the open site's level, play-testable. */
-export function WeekPreview({ sites, running, error, previewKey, tab, onTab }: Props) {
+export function WeekPreview({ sites, running, stale, error, previewKey, tab, onTab }: Props) {
   const [showSol, setShowSol] = useState(false);
   const open = tab === 'fallback' ? null : sites?.[tab] ?? null;
   const play = usePlacement(previewKey + '#' + tab);
@@ -52,9 +54,9 @@ export function WeekPreview({ sites, running, error, previewKey, tab, onTab }: P
         {sites?.some(s => s.ms > SLOW_MS) && <span className={pg.warn}>a sky took over {SLOW_MS} ms here</span>}
         {sites?.some(s => s.salt === null) && <span className={pg.warn}>a sky fell back</span>}
       </div>
-      <div className={cx(pg.stage, running && pg.stale)}>
+      <div className={cx(pg.stage, (running || stale) && pg.stale)}>
         {error && <p className={pg.warn}>{error}</p>}
-        {!sites && !error && <p className={pg.muted}>generating the week…</p>}
+        {!sites && !error && <p className={pg.muted}>{running ? 'generating the week…' : 'Generate the week to preview it.'}</p>}
         {tab === 'fallback' && sites && (
           <p className={pg.muted}>The fallback only runs for a sky whose retries all fail; the night above marks any sky that used it.</p>
         )}
