@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Button } from '../../themes/stargazer/kit/Button';
 import { cx } from '../../themes/stargazer/kit/cx';
+import { GenerateButton } from '../Playground/GenerateButton';
+import { generateStatus } from '../Playground/generateStatus';
 import { playStatus } from '../Playground/play';
 import { PlayBar } from '../Playground/PlayBar';
 import { PlayPreview } from '../Playground/PlayPreview';
@@ -13,18 +15,19 @@ import pg from '../Playground/Playground.module.css';
 /** A sky grown from the draft, as a schematic or as the game draws it, play-testable like the playground's. */
 export function RecipePreview({ params }: { params: PlaygroundParams }) {
   const [view, setView] = useState<'schematic' | 'sky'>('sky');
-  const { running, outcome, error, outcomeKey } = useGenerator(params);
+  const { generate, running, stale, outcome, error, outcomeKey } = useGenerator(params);
   const play = usePlacement(outcomeKey);
   const level = outcome?.level ?? null;
   return (
     <>
       <div className={pg.toolbar}>
+        <GenerateButton running={running} stale={stale} onGenerate={() => generate()} />
         <Button size="xs" kind={view === 'sky' ? 'primary' : 'soft'} onClick={() => setView('sky')}>Sky</Button>
         <Button size="xs" kind={view === 'schematic' ? 'primary' : 'soft'} onClick={() => setView('schematic')}>Schematic</Button>
         {level && <span className={pg.muted}>{level.nodes.length} stars · par {level.k} · {'★'.repeat(level.stars)}</span>}
-        <span className={cx(pg.status, running && pg.busy)}>{running ? 'growing…' : error ? 'error' : 'preview'}</span>
+        <span className={cx(pg.status, (running || stale) && pg.busy)}>{generateStatus(running, stale, error)}</span>
       </div>
-      <div className={cx(pg.stage, running && pg.stale)}>
+      <div className={cx(pg.stage, (running || stale) && pg.stale)}>
         {error && <p className={pg.warn}>{error}</p>}
         {level && view === 'sky' && <PlayPreview key={outcomeKey} level={level} placed={play.placed} onTapNode={play.toggle} />}
         {level && view === 'schematic' && outcome && (
